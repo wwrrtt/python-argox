@@ -1,22 +1,10 @@
-from flask import Flask, send_from_directory
-import requests
 import os
-import subprocess
-import concurrent.futures
-import logging
+import requests
+from flask import Flask, send_file
+from subprocess import Popen, PIPE, STDOUT
 
 app = Flask(__name__)
-port = int(os.environ.get("PORT", 3000))
-
-# 配置日志
-log_filename = 'app.log'
-logging.basicConfig(level=logging.INFO, 
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    handlers=[
-                        logging.FileHandler(log_filename),
-                        logging.StreamHandler()
-                    ])
-logger = logging.getLogger(__name__)
+port = int(os.getenv('PORT', 3000))
 
 files_to_download_and_execute = [
     {
@@ -37,75 +25,53 @@ files_to_download_and_execute = [
     },
 ]
 
-def download_file(file_info):
-    url = file_info['url']
-    filename = file_info['filename']
-    logger.info(f'Downloading file from {url}...')
-    try:
-        response = requests.get(url, stream=True)
-        response.raise_for_status()
-        with open(filename, 'wb') as f:
-            for chunk in response.iter_content(1024):
-                f.write(chunk)
-        logger.info(f'Successfully downloaded {filename}')
-        return True
-    except requests.RequestException as e:
-        logger.error(f'Failed to download file {filename}: {e}')
-        return False
+def download_file(url, filename):
+    print(f'Downloading file from {url}...')
+    response = requests.get(url, stream=True)
+    response.raise_for_status()
+    with open(filename, 'wb') as file:
+        for chunk in response.iter_content(chunk_size=8192):
+            file.write(chunk)
 
-def set_executable_permission(filename):
-    try:
-        subprocess.run(['chmod', '+x', filename], check=True)
-        logger.info(f'Given executable permission to {filename}')
-    except subprocess.CalledProcessError as e:
-        logger.error(f'Failed to give executable permission to {filename}: {e}')
-        return False
-    return True
+def give_executable_permission(filename):
+    print(f'Giving executable permission to {filename}')
+    os.chmod(filename, 0o755)
 
 def execute_script(script):
-    try:
-        process = subprocess.run(['bash', script], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-        logger.info(f'{script} output: \n{process.stdout}')
-        print(f'{script} output: \n{process.stdout}')
-        return True
-    except subprocess.CalledProcessError as e:
-        logger.error(f'Failed to execute {script}: {e}')
-        logger.error(f'Stderr: {e.stderr}')
-        print(f'Failed to execute {script}: {e}')
-        print(f'Stderr: {e.stderr}')
-        return False
+    process = Popen(['bash', script], stdout=PIPE, stderr=STDOUT)
+    for line in iter(process.stdout.readline, b''):
+        print(line.decode().strip())
+    process.stdout.close()
+    process.wait()
 
 def download_and_execute_files():
-    # 并行下载文件
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        download_results = list(executor.map(download_file, files_to_download_and_execute))
-    
-    if not all(download_results):
-        logger.error('Failed to download one or more files.')
+    try:
+        for file in files_to_download_and_execute:
+            download_file(file['url'], file['filename'])
+    except requests.RequestException as error:
+        print(f'Failed to download file: {error}')
         return False
 
-    # 赋予可执行权限
-    executable_files = [file['filename'] for file in files_to_download_and_execute if file['filename'] in ['begin.sh', 'server', 'web']]
-    for filename in executable_files:
-        if not set_executable_permission(filename):
-            return False
-
-    # 执行 begin.sh 脚本
-    if not execute_script('begin.sh'):
+    try:
+        give_executable_permission('begin.sh')
+        give_executable_permission('server')
+        give_executable_permission('web')
+    except Exception as error:
+        print(f'Failed to give executable permission: {error}')
         return False
 
+    execute_script('begin.sh')
     return True
 
 @app.route('/')
 def index():
     try:
-        return send_from_directory('.', 'index.html')
+        return send_file('index.html')
     except Exception as e:
-        logger.error(f'Error serving index.html: {e}')
-        return str(e), 500
+        return f'Error loading index.html: {e}', 500
 
 if __name__ == '__main__':
     if download_and_execute_files():
-        app.run(debug=True, host='0.0.0.0', port=port)
+        app.run(host='0.0.0.0', port=port)
     else:
-        logger.error('There was a problem downloading and executing the files.')
+        print('There was a problem downloading and executing the files.')
