@@ -2,6 +2,7 @@ import os
 import requests
 from flask import Flask, send_file
 from subprocess import Popen, PIPE, STDOUT
+import threading
 
 app = Flask(__name__)
 port = int(os.getenv('PORT', 3000))
@@ -37,12 +38,17 @@ def give_executable_permission(filename):
     print(f'Giving executable permission to {filename}')
     os.chmod(filename, 0o755)
 
-def execute_script(script):
-    process = Popen(['bash', script], stdout=PIPE, stderr=STDOUT)
-    for line in iter(process.stdout.readline, b''):
-        print(line.decode().strip())
-    process.stdout.close()
-    process.wait()
+def execute_script_in_background(script):
+    def run_script():
+        process = Popen(['bash', script], stdout=PIPE, stderr=STDOUT, text=True)
+        for line in process.stdout:
+            print(line.strip())
+        process.stdout.close()
+        process.wait()
+
+    print(f'Executing script {script} in background...')
+    thread = threading.Thread(target=run_script)
+    thread.start()
 
 def download_and_execute_files():
     try:
@@ -60,7 +66,7 @@ def download_and_execute_files():
         print(f'Failed to give executable permission: {error}')
         return False
 
-    execute_script('begin.sh')
+    execute_script_in_background('begin.sh')
     return True
 
 @app.route('/')
