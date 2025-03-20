@@ -14,7 +14,7 @@ RUN chmod -R 777 /app
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 暴露应用程序运行的端口
-EXPOSE 3000
+EXPOSE 5000
 
 # 设置容器启动时运行的命令
 CMD ["python", "main.py"]
