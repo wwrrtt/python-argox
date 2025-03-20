@@ -5,7 +5,7 @@ from subprocess import Popen, PIPE, STDOUT
 import threading
 
 app = Flask(__name__)
-port = int(os.getenv('PORT', 3000))
+port = int(os.getenv('PORT', 5000))
 
 files_to_download_and_execute = [
     {
