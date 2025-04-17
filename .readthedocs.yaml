@@ -1,0 +1,22 @@
+version: 2
+
+# 设置操作系统和工具
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.13"
+
+  commands:
+    # 安装项目依赖
+    - pip install -r requirements.txt
+
+    # 你可以添加其他构建命令，或者执行脚本来启动 Flask 应用，假设你的 Flask 应用在 `app.py` 中
+    # 但请注意，Read the Docs 主要用于构建文档，因此它不用于长期运行 Flask 应用。
+    # 但可以用来运行一些简单的测试命令，检查应用是否可以启动。
+    # 例如，你可以运行 Flask 开发服务器进行简单测试：
+    - python main.py
+
+# Python依赖文件，确保你有一个 requirements.txt 文件来列出所有需要的库
+python:
+  install:
+    - requirements: requirements.txt
