@@ -12,7 +12,6 @@ RUN chmod -R 777 /app
 
 # 安装依赖库
 RUN pip install --no-cache-dir -r requirements.txt
-RUN python -m pip install --upgrade build && python -m build || cat /root/.cache/pip/log/debug.log
 
 # 暴露应用程序运行的端口
 EXPOSE 5000
